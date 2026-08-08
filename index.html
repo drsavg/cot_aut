@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>COT · Autoaprendizaje (versión alumno)</title>
+<title>COT · Autoaprendizaje (versión estudiante)</title>
 <style>
   :root{
     --paper:#FFFFFF; --card:#FFFFFF; --ink:#1D1D1F; --mut:#6E6E73; --mut3:#86868B;
@@ -132,7 +132,7 @@
     <div class="eyebrow">Facultad de Odontología · Universidad de Chile</div>
     <h1>Convergencia oclusal total (COT)</h1>
     <div class="sub">Preparación biológica en tubo de acrílico · Prótesis Fija</div>
-    <span class="badge">Autoaprendizaje · versión alumno</span>
+    <span class="badge">Autoaprendizaje - versión estudiante</span>
   </div>
   <button id="gearBtn" aria-label="Ajustar umbrales">⚙</button>
 </header>
@@ -146,8 +146,8 @@
 <main>
 
 <div class="card alBar" id="alBar">
-  <label class="f" for="alGlobal">Alumno/a</label>
-  <input type="text" id="alGlobal" autocomplete="off" placeholder="Nombre o n° de lista">
+  <label class="f" for="alGlobal">Estudiante</label>
+  <input type="text" id="alGlobal" autocomplete="off" maxlength="40" placeholder="Nombre o n° de lista">
 </div>
 
 <!-- ============ FOTO ============ -->
@@ -275,7 +275,7 @@
 <div class="dlg" id="editDlg" hidden>
   <div class="box">
     <div class="dlgHead"><h3>Editar registro</h3><button class="xbtn" id="eClose" aria-label="Cerrar">✕</button></div>
-    <div class="fw"><label class="f" for="eAl">Alumno/a</label><input type="text" id="eAl" autocomplete="off"></div>
+    <div class="fw"><label class="f" for="eAl">Estudiante</label><input type="text" id="eAl" autocomplete="off" maxlength="40"></div>
     <div class="fw"><label class="f" for="eTerm">Terminación</label>
       <select id="eTerm">
         <option>Chamfer profundo</option><option>Chamfer simple</option>
@@ -384,7 +384,7 @@ function renderRecords(){
       <td><button class="ed" aria-label="Editar" data-ed="${i}">✎</button><button class="del" aria-label="Eliminar" data-del="${i}">✕</button></td>
     </tr>`;
   }).join("");
-  w.innerHTML = `<table><thead><tr><th></th><th>Alumno/a</th><th>Preparación</th><th>COT</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  w.innerHTML = `<table><thead><tr><th></th><th>Estudiante</th><th>Preparación</th><th>COT</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   w.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
     if(confirm("¿Eliminar este registro?")){ records.splice(+b.dataset.del,1); renderRecords(); }
   }));
@@ -431,9 +431,9 @@ function buildPrint(list){
     out += `<section class="stu">
       <div class="phead"><img src="${escSrc}" alt=""><div>
         <div class="pt1">Convergencia oclusal total — informe de autoaprendizaje</div>
-        <div class="pt2">Versión del alumno · Área de Prótesis Fija · Facultad de Odontología · Universidad de Chile</div>
+        <div class="pt2">Versión del estudiante · Área de Prótesis Fija · Facultad de Odontología · Universidad de Chile</div>
       </div></div>
-      <div class="meta"><b>Alumno/a:</b> ${esc(al)} &nbsp;&nbsp; <b>Fecha:</b> ${new Date().toLocaleDateString("es-CL")}</div>`;
+      <div class="meta"><b>Estudiante:</b> ${esc(al)} &nbsp;&nbsp; <b>Fecha:</b> ${new Date().toLocaleDateString("es-CL")}</div>`;
     rs.forEach((r,i)=>{
       out += `<div class="prep"><div class="pnum">${i+1}. ${esc(r.term)}${r.vista&&r.vista!=="única"?" · vista "+esc(r.vista):""} <span class="orig">(${r.origen} · ${r.fecha} ${r.hora})</span></div>`;
       if(r.img) out += `<img class="ph" src="${r.img}" alt="">`;
