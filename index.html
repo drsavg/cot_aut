@@ -241,7 +241,7 @@
 <section id="tab-reg" hidden>
   <div class="card">
     <h2>Mi avance</h2>
-    <div class="note">Tus registros viven mientras esta página esté abierta. Exporta tu PDF antes de cerrar o recargar.</div>
+    <div class="note">Tus registros quedan guardados en este dispositivo. Agrega la app a la pantalla de inicio para que el navegador no los limpie tras días sin uso; tu PDF sigue siendo tu respaldo.</div>
     <div id="regTableWrap"><div class="empty">Aún no hay mediciones guardadas.</div></div>
     <div class="row btns">
       <button class="pri" id="pdfBtn">Exportar mi PDF</button>
@@ -295,7 +295,32 @@
 /* ---------- estado ---------- */
 const T = { vmin: 3, verde: 6, amar: 12 };
 const num = v => parseFloat(String(v ?? "").trim().replace(",", "."));
-const records = [];               // solo en memoria durante la sesión
+const DB_NAME="cot_estudiante_db", CFG_KEY="cotEst_cfg";
+const records = [];
+/* ---------- persistencia local (híbrida) ---------- */
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+let idb=null;
+function idbOpen(){ return new Promise(res=>{ try{
+  const rq=indexedDB.open(DB_NAME,1);
+  rq.onupgradeneeded=()=>{ rq.result.createObjectStore("registros",{keyPath:"_id",autoIncrement:true}); };
+  rq.onsuccess=()=>res(rq.result);
+  rq.onerror=()=>res(null);
+}catch(e){ res(null); } }); }
+function idbPut(r){ if(!idb) return; try{
+  const rq=idb.transaction("registros","readwrite").objectStore("registros").put(r);
+  rq.onsuccess=()=>{ r._id=rq.result; };
+}catch(e){} }
+function idbDel(id){ if(!idb||id==null) return; try{ idb.transaction("registros","readwrite").objectStore("registros").delete(id); }catch(e){} }
+function idbClear(){ if(!idb) return; try{ idb.transaction("registros","readwrite").objectStore("registros").clear(); }catch(e){} }
+function idbAll(){ return new Promise(res=>{ if(!idb) return res([]); try{
+  const rq=idb.transaction("registros","readonly").objectStore("registros").getAll();
+  rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]);
+}catch(e){ res([]); } }); }
+
+function saveCfg(){
+  lsSet(CFG_KEY, JSON.stringify({ nombre: $("alGlobal").value, T: T }));
+}
 const $ = id => document.getElementById(id);
 
 /* ---------- tabs ---------- */
@@ -363,7 +388,7 @@ function stamp(){
   return { fecha: d.toLocaleDateString("es-CL"), hora: d.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) };
 }
 function addRecord(r){
-  records.push(r); renderRecords();
+  records.push(r); idbPut(r); renderRecords();
   toast("Avance guardado ("+records.length+")");
 }
 function filteredRecords(){
@@ -386,12 +411,13 @@ function renderRecords(){
   }).join("");
   w.innerHTML = `<table><thead><tr><th></th><th>Estudiante</th><th>Preparación</th><th>COT</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   w.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
-    if(confirm("¿Eliminar este registro?")){ records.splice(+b.dataset.del,1); renderRecords(); }
+    const i=+b.dataset.del;
+    if(confirm("¿Eliminar este registro?")){ idbDel(records[i]._id); records.splice(i,1); renderRecords(); }
   }));
   w.querySelectorAll("[data-ed]").forEach(b=>b.addEventListener("click",()=>openEdit(+b.dataset.ed)));
 }
 $("clearBtn").addEventListener("click",()=>{
-  if(records.length && confirm("¿Borrar los "+records.length+" registros de la sesión?")){ records.length=0; renderRecords(); }
+  if(records.length && confirm("¿Borrar los "+records.length+" registros guardados?")){ idbClear(); records.length=0; renderRecords(); }
 });
 
 /* edición */
@@ -405,6 +431,7 @@ $("eSave").addEventListener("click",()=>{
   if(editIdx>=0){
     const r=records[editIdx];
     r.alumno=$("eAl").value.trim(); r.term=$("eTerm").value; r.vista=$("eVista").value;
+    idbPut(r);
     renderRecords();
   }
   $("editDlg").hidden=true;
@@ -452,7 +479,7 @@ $("gearBtn").addEventListener("click",()=>{ $("uVmin").value=T.vmin; $("uV").val
 $("uDef").addEventListener("click",()=>{ $("uVmin").value=3; $("uV").value=6; $("uA").value=12; });
 $("uOk").addEventListener("click",()=>{
   const m=num($("uVmin").value), v=num($("uV").value), a=num($("uA").value);
-  if(isFinite(m)&&isFinite(v)&&isFinite(a)&&m>=0&&v>m&&a>v){ T.vmin=m; T.verde=v; T.amar=a; }
+  if(isFinite(m)&&isFinite(v)&&isFinite(a)&&m>=0&&v>m&&a>v){ T.vmin=m; T.verde=v; T.amar=a; saveCfg(); }
   $("gearDlg").hidden=true;
   if(lastFotoCot!==null) refreshFoto();
   calc();
@@ -865,6 +892,23 @@ fitEsc();
 setTimeout(fitEsc,150);
 
 syncLock();
+$("alGlobal").addEventListener("input",saveCfg);
+(async function initPersist(){
+  try{
+    const cfg = JSON.parse(lsGet(CFG_KEY)||"null");
+    if(cfg){
+      if(cfg.nombre) $("alGlobal").value=cfg.nombre;
+      if(cfg.T && isFinite(cfg.T.vmin) && isFinite(cfg.T.verde) && isFinite(cfg.T.amar)){ T.vmin=cfg.T.vmin; T.verde=cfg.T.verde; T.amar=cfg.T.amar; }
+    }
+  }catch(e){}
+  idb = await idbOpen();
+  const saved = await idbAll();
+  if(saved.length){
+    records.push(...saved);
+    renderRecords();
+    toast("Restaurados "+saved.length+" registros guardados en este dispositivo");
+  }
+})();
 </script>
 </body>
 </html>
